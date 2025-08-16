@@ -1,226 +1,141 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>📱 قارئ محادثات واتساب (مع وسائط)</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>قارئ محادثة واتساب</title>
   <style>
-    body { font-family: 'Tahoma', sans-serif; background: #f0f2f5; margin:0; padding:20px; transition:0.3s; }
-    h1 { text-align: center; margin-bottom: 15px; }
-    .controls { text-align: center; margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-    .btn, .upload-btn { background:#25d366; color:white; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; font-size:14px; transition:0.3s; }
-    .btn:hover, .upload-btn:hover { background:#1ebc59; }
-    .search-box { padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:14px; width:160px; }
-    .chat-box { background:white; border-radius:12px; padding:12px; height:70vh; overflow-y:auto; box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:0.3s; }
-    .msg { padding:8px 12px; border-radius:12px; margin:5px 0; max-width:75%; word-wrap:break-word; }
-    .right { text-align:right; }
-    .left { text-align:left; }
-    .right .msg { background:#dcf8c6; float:right; clear:both; }
-    .left .msg { background:#fff; border:1px solid #ddd; float:left; clear:both; }
-    img, video { max-width:220px; border-radius:8px; margin-top:5px; display:block; }
-    audio { width:220px; margin-top:5px; }
-    .highlight { background:yellow; }
-    @media(max-width:600px){
-      .msg{max-width:90%;}
-      img,video,audio{max-width:100%;}
-      .search-box{width:100px;}
+    :root{
+      --brand:#008069; --brand-dark:#006f5c;
+      --bg:#f0f2f5; --panel:#fafafa; --bubble-me:#d1ffd1; --bubble-other:#ffffff;
+      --bg-dark:#18191a; --panel-dark:#242526; --bubble-me-dark:#056162; --bubble-other-dark:#3a3b3c;
     }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Tahoma",system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#111;transition:.25s}
+    .dark{background:var(--bg-dark);color:#e4e6eb}
+    header{position:sticky;top:0;z-index:5;padding:12px;background:var(--brand);color:#fff;text-align:center;font-size:22px;font-weight:700}
 
-    /* 🌙 الوضع الليلي */
-    body.dark { background:#1e1e1e; color:#f0f0f0; }
-    body.dark .chat-box { background:#2c2c2c; box-shadow:0 2px 6px rgba(255,255,255,0.1); }
-    body.dark .right .msg { background:#056162; color:#fff; }
-    body.dark .left .msg { background:#262d31; border:none; color:#fff; }
-    body.dark .btn, body.dark .upload-btn { background:#444; color:#fff; }
-    body.dark .btn:hover, body.dark .upload-btn:hover { background:#666; }
-    body.dark .search-box { background:#333; color:#fff; border:1px solid #555; }
+    .controls{
+      position:sticky; top:56px; z-index:4;
+      display:flex; flex-direction:column; gap:8px; padding:12px; background:var(--panel);
+      border-bottom:1px solid #e6e6e6;
+    }
+    .dark .controls{background:var(--panel-dark); border-bottom-color:#3a3b3c}
+
+    input[type="file"]{display:none}
+    .file-label, .btn, .search{
+      padding:12px 14px; border:none; border-radius:14px; font-size:14px;
+    }
+    .file-label, .btn{background:var(--brand); color:#fff; cursor:pointer}
+    .file-label:hover, .btn:hover{background:var(--brand-dark)}
+    .search{background:#fff; flex:1}
+    .dark .search{background:#333; color:#fff}
+
+    /* صفوف موبايل */
+    .row{display:flex; gap:8px; align-items:center; justify-content:space-between}
+    .row.icons .btn{flex:0 0 auto; padding:2px; font-size:13px; border-radius:50%}
+
+    /* منطقة الدردشة */
+    #chat{height:calc(100vh - 56px - 120px);padding:12px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
+    .msg{margin:8px 0;padding:18px;border-radius:20px;max-width:95%;word-wrap:break-word;box-shadow:0 1px 2px rgba(0,0,0,.06);font-size:18px;line-height:1.45;display:flex;flex-direction:column}
+    .sender{font-weight:700;font-size:14px;opacity:.9;margin-bottom:8px}
+    .from{background:var(--bubble-me);margin-left:auto;text-align:right}
+    .to{background:var(--bubble-other);margin-right:auto;text-align:left}
+    .dark .from{background:var(--bubble-me-dark);color:#fff}
+    .dark .to{background:var(--bubble-other-dark);color:#fff}
+    .from .sender{color:#0c7a43}
+    .to .sender{color:#1c6dd0}
+    mark{background:yellow;padding:0 .2em}
+
+    /* شاشات أوسع */
+    @media (min-width: 700px){
+      .controls{flex-direction:row;flex-wrap:wrap;align-items:center}
+      .row{flex:1}
+      .row.icons .btn{border-radius:12px; font-size:16px; padding:10px 14px}
+      #chat{height:calc(100vh - 56px - 88px)}
+      .msg{max-width:75%;font-size:18px;padding:12px 16px}
+      .sender{font-size:14px}
+    }
+    @media (min-width: 1100px){.msg{max-width:65%}}
   </style>
 </head>
 <body>
-  <h1>📱 قارئ محادثات واتساب (مع وسائط)</h1>
+  <header>💬 قارئ محادثة واتساب</header>
+
   <div class="controls">
-    <input type="file" id="zipInput" accept=".zip" class="upload-btn">
-    <input type="text" id="searchInput" class="search-box" placeholder="🔍 بحث...">
-    <button class="btn" onclick="searchChat()">بحث</button>
-    <button class="btn" onclick="prevResult()">⬆ السابق</button>
-    <button class="btn" onclick="nextResult()">⬇ التالي</button>
-    <button class="btn" onclick="scrollTopChat()">⏫ أول الشات</button>
-    <button class="btn" onclick="scrollBottomChat()">⏬ آخر الشات</button>
-    <button class="btn" onclick="toggleTheme()">🌙/☀️</button>
+    <!-- الصف الأول -->
+    <div class="row">
+      <label for="fileInput" class="file-label">📂 ملف</label>
+      <input type="file" id="fileInput" accept=".txt" />
+      <button class="btn" onclick="toggleDark()">🌙/☀️</button>
+    </div>
+
+    <!-- الصف الثاني -->
+    <div class="row icons">
+      <input type="text" id="searchInput" class="search" placeholder="🔍..." />
+      <button class="btn" onclick="searchChat()">🔍</button>
+      <button class="btn" onclick="prevResult()">⏮️</button>
+      <button class="btn" onclick="nextResult()">⏭️</button>
+      <button class="btn" onclick="scrollTopChat()">⬆️</button>
+      <button class="btn" onclick="scrollBottomChat()">⬇️</button>
+    </div>
   </div>
 
-  <div id="chatBox" class="chat-box"></div>
+  <div id="chat" aria-live="polite"></div>
 
   <script>
-    let messages = [];
-    let searchResults = [];
-    let currentIndex = -1;
+    const chatDiv = document.getElementById("chat");
+    let messages = [], results = [], currentIndex = -1;
 
-    document.getElementById("zipInput").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const zip = await JSZip.loadAsync(file);
-      const chatFile = zip.file(/\.txt$/i)[0];
-      if (!chatFile) {
-        alert("لم يتم العثور على ملف chat.txt داخل ZIP");
-        return;
-
-        
-
-
-      }
-
-      const text = await chatFile.async("string");
-      const lines = text.split("\n").filter(l => l.trim() !== "");
-      const chatBox = document.getElementById("chatBox");
-      chatBox.innerHTML = "";
-      messages = [];
-
-      for (let line of lines) {
-        const parts = line.split(" - ");
-        if (parts.length < 2) continue;
-        const rest = parts[1].split(":");
-        if (rest.length < 2) continue;
-
-        const sender = rest[0].trim();
-        const message = rest.slice(1).join(":").trim();
-
-        const div = document.createElement("div");
-        div.className = sender.includes("Ammar") ? "right" : "left";
-
-        let content = `<div class="msg"><b>${sender}</b><br>${message}`;
-
-        // 🔎 التحقق من وجود مرفق
-        // const match = message.match(/<attached: (.+)>/);
-        // if (match) {
-        //   const fileName = match[1];
-        //   const mediaFile = zip.file(fileName)[0];
-        //   if (mediaFile) {
-        //     const blob = await mediaFile.async("blob");
-        //     const url = URL.createObjectURL(blob);
-        //     if (fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
-        //       content += `<br><img src="${url}">`;
-        //     } else if (fileName.match(/\.(mp4|webm|mov)$/i)) {
-        //       content += `<br><video controls src="${url}"></video>`;
-        //     } else if (fileName.match(/\.(opus|mp3|ogg|wav)$/i)) {
-        //       content += `<br><audio controls src="${url}"></audio>`;
-        //     } else {
-        //       content += `<br><a href="${url}" download="${fileName}">📎 تحميل المرفق</a>`;
-        //     }
-        //   }
-        // }
-        //         // 🔎 التحقق من وجود مرفق
-        // const match = message.match(/<attached: (.+)>/);
-        // if (match) {
-        //   const fileName = match[1];
-        //   // البحث في جميع مجلدات الـ ZIP
-        //   const safeName = fileName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        //   const mediaFile = zip.file(new RegExp(safeName + "$", "i"))[0];
-
-        //   if (mediaFile) {
-        //     const blob = await mediaFile.async("blob");
-        //     const url = URL.createObjectURL(blob);
-        //     if (fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
-        //       content += `<br><img src="${url}">`;
-        //     } else if (fileName.match(/\.(mp4|webm|mov)$/i)) {
-        //       content += `<br><video controls src="${url}"></video>`;
-        //     } else if (fileName.match(/\.(opus|mp3|ogg|wav)$/i)) {
-        //       content += `<br><audio controls src="${url}"></audio>`;
-        //     } else {
-        //       content += `<br><a href="${url}" download="${fileName}">📎 تحميل المرفق</a>`;
-        //     }
-        //   } else {
-        //     content += `<br><i>⚠️ المرفق غير موجود داخل ZIP</i>`;
-        //   }
-        // }
-
-
-
-        // 🔎  v3التحقق من وجود مرفق
-const match = message.match(/<attached: (.+)>/);
-if (match) {
-  const fileName = match[1].trim();
-
-  // البحث عن الملف بالاسم بالضبط داخل الـ ZIP
-  const mediaFile = zip.file(fileName)[0];
-
-  if (mediaFile) {
-    const blob = await mediaFile.async("blob");
-    const url = URL.createObjectURL(blob);
-
-    if (fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
-      content += `<br><img src="${url}" alt="${fileName}">`;
-    } else if (fileName.match(/\.(mp4|webm|mov)$/i)) {
-      content += `<br><video controls src="${url}"></video>`;
-    } else if (fileName.match(/\.(opus|mp3|ogg|wav)$/i)) {
-      content += `<br><audio controls src="${url}"></audio>`;
-    } else {
-      content += `<br><a href="${url}" download="${fileName}">📎 تحميل ${fileName}</a>`;
-    }
-  } else {
-    content += `<br><i>⚠️ المرفق ${fileName} غير موجود داخل ZIP</i>`;
-  }
-}
-
-        content += "</div>";
-        div.innerHTML = content;
-        chatBox.appendChild(div);
-        messages.push(div);
-      }
+    document.getElementById("fileInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const text = await file.text();
+      renderChat(text);
+      requestAnimationFrame(() => scrollBottomChat());
     });
 
-    function searchChat() {
-      const keyword = document.getElementById("searchInput").value.trim();
-      if (!keyword) return;
-      searchResults = [];
-      currentIndex = -1;
-
-      messages.forEach(msg => msg.querySelector(".msg").innerHTML = msg.querySelector(".msg").innerHTML.replace(/<span class="highlight">|<\/span>/g, ""));
-
-      messages.forEach((msg, i) => {
-        if (msg.innerText.includes(keyword)) {
-          searchResults.push(i);
-          const inner = msg.querySelector(".msg").innerHTML;
-          msg.querySelector(".msg").innerHTML = inner.replace(new RegExp(keyword, "gi"), match => `<span class="highlight">${match}</span>`);
-        }
-      });
-
-      if (searchResults.length > 0) {
-        currentIndex = 0;
-        scrollToMessage(searchResults[currentIndex]);
+    function renderChat(chatText) {
+      chatDiv.innerHTML = ""; messages = [];
+      const lines = chatText.split("\n");
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parts = line.split(" - ");
+        if (parts.length < 2) continue;
+        const msgPart = parts.slice(1).join(" - ");
+        const senderSplit = msgPart.split(": ");
+        if (senderSplit.length < 2) continue;
+        const sender = senderSplit[0];
+        const message = senderSplit.slice(1).join(": ");
+        const msgDiv = document.createElement("div");
+        const isMe = guessIsMe(sender);
+        msgDiv.className = "msg " + (isMe ? "from" : "to");
+        msgDiv.innerHTML = `<div class="sender">${sender}</div><div class="text">${message}</div>`;
+        chatDiv.appendChild(msgDiv); messages.push(msgDiv);
       }
     }
 
-    function scrollToMessage(index) {
-      messages[index].scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    function guessIsMe(name){ return /ammar|عمّار|عمار/i.test(name); }
 
-    function nextResult() {
-      if (searchResults.length === 0) return;
-      currentIndex = (currentIndex + 1) % searchResults.length;
-      scrollToMessage(searchResults[currentIndex]);
+    function escapeRegExp(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
+    function searchChat() {
+      const term=document.getElementById("searchInput").value.trim(); if(!term) return;
+      results=[]; currentIndex=-1;
+      messages.forEach(m=>{
+        m.querySelector(".text").innerHTML=m.querySelector(".text").innerHTML.replace(/<mark>|<\/mark>/g,"");
+        if(m.innerText.includes(term)){
+          results.push(m);
+          m.querySelector(".text").innerHTML=m.querySelector(".text").innerHTML.replace(new RegExp(escapeRegExp(term),"gi"),t=>`<mark>${t}</mark>`);
+        }
+      });
+      if(results.length){currentIndex=0;scrollToResult();} else alert("لا توجد نتائج");
     }
-
-    function prevResult() {
-      if (searchResults.length === 0) return;
-      currentIndex = (currentIndex - 1 + searchResults.length) % searchResults.length;
-      scrollToMessage(searchResults[currentIndex]);
-    }
-
-    function scrollTopChat() {
-      document.getElementById("chatBox").scrollTop = 0;
-    }
-
-    function scrollBottomChat() {
-      const chatBox = document.getElementById("chatBox");
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    // 🌙 التبديل بين الوضع الليلي والنهاري
-    function toggleTheme() {
-      document.body.classList.toggle("dark");
-    }
+    function nextResult(){if(results.length){currentIndex=(currentIndex+1)%results.length;scrollToResult();}}
+    function prevResult(){if(results.length){currentIndex=(currentIndex-1+results.length)%results.length;scrollToResult();}}
+    function scrollToResult(){results[currentIndex].scrollIntoView({behavior:"smooth",block:"center"});}
+    function scrollTopChat(){chatDiv.scrollTop=0;}
+    function scrollBottomChat(){chatDiv.scrollTop=chatDiv.scrollHeight;}
+    function toggleDark(){document.body.classList.toggle("dark");try{localStorage.setItem("chat_theme",document.body.classList.contains("dark")?"dark":"light");}catch(_){ }}
+    (function(){try{if(localStorage.getItem("chat_theme")==="dark")document.body.classList.add("dark");}catch(_){}})();
   </script>
 </body>
 </html>
