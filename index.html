@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>📱 قارئ محادثات واتساب (مع وسائط)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <style>
+    body { font-family: 'Tahoma', sans-serif; background: #f0f2f5; margin:0; padding:20px; transition:0.3s; }
+    h1 { text-align: center; margin-bottom: 15px; }
+    .controls { text-align: center; margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .btn, .upload-btn { background:#25d366; color:white; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; font-size:14px; transition:0.3s; }
+    .btn:hover, .upload-btn:hover { background:#1ebc59; }
+    .search-box { padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:14px; width:160px; }
+    .chat-box { background:white; border-radius:12px; padding:12px; height:70vh; overflow-y:auto; box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:0.3s; }
+    .msg { padding:8px 12px; border-radius:12px; margin:5px 0; max-width:75%; word-wrap:break-word; }
+    .right { text-align:right; }
+    .left { text-align:left; }
+    .right .msg { background:#dcf8c6; float:right; clear:both; }
+    .left .msg { background:#fff; border:1px solid #ddd; float:left; clear:both; }
+    img, video { max-width:220px; border-radius:8px; margin-top:5px; display:block; }
+    audio { width:220px; margin-top:5px; }
+    .highlight { background:yellow; }
+    @media(max-width:600px){
+      .msg{max-width:90%;}
+      img,video,audio{max-width:100%;}
+      .search-box{width:100px;}
+    }
+
+    /* 🌙 الوضع الليلي */
+    body.dark { background:#1e1e1e; color:#f0f0f0; }
+    body.dark .chat-box { background:#2c2c2c; box-shadow:0 2px 6px rgba(255,255,255,0.1); }
+    body.dark .right .msg { background:#056162; color:#fff; }
+    body.dark .left .msg { background:#262d31; border:none; color:#fff; }
+    body.dark .btn, body.dark .upload-btn { background:#444; color:#fff; }
+    body.dark .btn:hover, body.dark .upload-btn:hover { background:#666; }
+    body.dark .search-box { background:#333; color:#fff; border:1px solid #555; }
+  </style>
+</head>
+<body>
+  <h1>📱 قارئ محادثات واتساب (مع وسائط)</h1>
+  <div class="controls">
+    <input type="file" id="zipInput" accept=".zip" class="upload-btn">
+    <input type="text" id="searchInput" class="search-box" placeholder="🔍 بحث...">
+    <button class="btn" onclick="searchChat()">بحث</button>
+    <button class="btn" onclick="prevResult()">⬆ السابق</button>
+    <button class="btn" onclick="nextResult()">⬇ التالي</button>
+    <button class="btn" onclick="scrollTopChat()">⏫ أول الشات</button>
+    <button class="btn" onclick="scrollBottomChat()">⏬ آخر الشات</button>
+    <button class="btn" onclick="toggleTheme()">🌙/☀️</button>
+  </div>
+
+  <div id="chatBox" class="chat-box"></div>
+
+  <script>
+    let messages = [];
+    let searchResults = [];
+    let currentIndex = -1;
+
+    document.getElementById("zipInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const zip = await JSZip.loadAsync(file);
+      const chatFile = zip.file(/\.txt$/i)[0];
+      if (!chatFile) {
+        alert("لم يتم العثور على ملف chat.txt داخل ZIP");
+        return;
+
+        
+
+
+      }
+
+      const text = await chatFile.async("string");
+      const lines = text.split("\n").filter(l => l.trim() !== "");
+      const chatBox = document.getElementById("chatBox");
+      chatBox.innerHTML = "";
+      messages = [];
+
+      for (let line of lines) {
+        const parts = line.split(" - ");
+        if (parts.length < 2) continue;
+        const rest = parts[1].split(":");
+        if (rest.length < 2) continue;
+
+        const sender = rest[0].trim();
+        const message = rest.slice(1).join(":").trim();
+
+        const div = document.createElement("div");
+        div.className = sender.includes("Ammar") ? "right" : "left";
+
+        let content = `<div class="msg"><b>${sender}</b><br>${message}`;
+
+        // 🔎 التحقق من وجود مرفق
+        // const match = message.match(/<attached: (.+)>/);
+        // if (match) {
+        //   const fileName = match[1];
+        //   const mediaFile = zip.file(fileName)[0];
+        //   if (mediaFile) {
+        //     const blob = await mediaFile.async("blob");
+        //     const url = URL.createObjectURL(blob);
+        //     if (fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
+        //       content += `<br><img src="${url}">`;
+        //     } else if (fileName.match(/\.(mp4|webm|mov)$/i)) {
+        //       content += `<br><video controls src="${url}"></video>`;
+        //     } else if (fileName.match(/\.(opus|mp3|ogg|wav)$/i)) {
+        //       content += `<br><audio controls src="${url}"></audio>`;
+        //     } else {
+        //       content += `<br><a href="${url}" download="${fileName}">📎 تحميل المرفق</a>`;
+        //     }
+        //   }
+        // }
+        //         // 🔎 التحقق من وجود مرفق
+        // const match = message.match(/<attached: (.+)>/);
+        // if (match) {
+        //   const fileName = match[1];
+        //   // البحث في جميع مجلدات الـ ZIP
+        //   const safeName = fileName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        //   const mediaFile = zip.file(new RegExp(safeName + "$", "i"))[0];
+
+        //   if (mediaFile) {
+        //     const blob = await mediaFile.async("blob");
+        //     const url = URL.createObjectURL(blob);
+        //     if (fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
+        //       content += `<br><img src="${url}">`;
+        //     } else if (fileName.match(/\.(mp4|webm|mov)$/i)) {
+        //       content += `<br><video controls src="${url}"></video>`;
+        //     } else if (fileName.match(/\.(opus|mp3|ogg|wav)$/i)) {
+        //       content += `<br><audio controls src="${url}"></audio>`;
+        //     } else {
+        //       content += `<br><a href="${url}" download="${fileName}">📎 تحميل المرفق</a>`;
+        //     }
+        //   } else {
+        //     content += `<br><i>⚠️ المرفق غير موجود داخل ZIP</i>`;
+        //   }
+        // }
+
+
+
+        // 🔎  v3التحقق من وجود مرفق
+const match = message.match(/<attached: (.+)>/);
+if (match) {
+  const fileName = match[1].trim();
+
+  // البحث عن الملف بالاسم بالضبط داخل الـ ZIP
+  const mediaFile = zip.file(fileName)[0];
+
+  if (mediaFile) {
+    const blob = await mediaFile.async("blob");
+    const url = URL.createObjectURL(blob);
+
+    if (fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
+      content += `<br><img src="${url}" alt="${fileName}">`;
+    } else if (fileName.match(/\.(mp4|webm|mov)$/i)) {
+      content += `<br><video controls src="${url}"></video>`;
+    } else if (fileName.match(/\.(opus|mp3|ogg|wav)$/i)) {
+      content += `<br><audio controls src="${url}"></audio>`;
+    } else {
+      content += `<br><a href="${url}" download="${fileName}">📎 تحميل ${fileName}</a>`;
+    }
+  } else {
+    content += `<br><i>⚠️ المرفق ${fileName} غير موجود داخل ZIP</i>`;
+  }
+}
+
+        content += "</div>";
+        div.innerHTML = content;
+        chatBox.appendChild(div);
+        messages.push(div);
+      }
+    });
+
+    function searchChat() {
+      const keyword = document.getElementById("searchInput").value.trim();
+      if (!keyword) return;
+      searchResults = [];
+      currentIndex = -1;
+
+      messages.forEach(msg => msg.querySelector(".msg").innerHTML = msg.querySelector(".msg").innerHTML.replace(/<span class="highlight">|<\/span>/g, ""));
+
+      messages.forEach((msg, i) => {
+        if (msg.innerText.includes(keyword)) {
+          searchResults.push(i);
+          const inner = msg.querySelector(".msg").innerHTML;
+          msg.querySelector(".msg").innerHTML = inner.replace(new RegExp(keyword, "gi"), match => `<span class="highlight">${match}</span>`);
+        }
+      });
+
+      if (searchResults.length > 0) {
+        currentIndex = 0;
+        scrollToMessage(searchResults[currentIndex]);
+      }
+    }
+
+    function scrollToMessage(index) {
+      messages[index].scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function nextResult() {
+      if (searchResults.length === 0) return;
+      currentIndex = (currentIndex + 1) % searchResults.length;
+      scrollToMessage(searchResults[currentIndex]);
+    }
+
+    function prevResult() {
+      if (searchResults.length === 0) return;
+      currentIndex = (currentIndex - 1 + searchResults.length) % searchResults.length;
+      scrollToMessage(searchResults[currentIndex]);
+    }
+
+    function scrollTopChat() {
+      document.getElementById("chatBox").scrollTop = 0;
+    }
+
+    function scrollBottomChat() {
+      const chatBox = document.getElementById("chatBox");
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // 🌙 التبديل بين الوضع الليلي والنهاري
+    function toggleTheme() {
+      document.body.classList.toggle("dark");
+    }
+  </script>
+</body>
+</html>
